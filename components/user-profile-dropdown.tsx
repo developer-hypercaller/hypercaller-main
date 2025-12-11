@@ -105,7 +105,7 @@ export function UserProfileDropdown({ user }: UserProfileDropdownProps) {
             <button
               onClick={() => {
                 setIsOpen(false);
-                // Navigate to profile page (if exists) or do nothing
+                router.push("/profile");
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-accent transition-colors"
             >
