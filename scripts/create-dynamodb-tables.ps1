@@ -106,6 +106,10 @@ $sessionsTable = @{
         ReadCapacityUnits = 5
         WriteCapacityUnits = 5
     }
+    TimeToLiveSpecification = @{
+        Enabled = $true
+        AttributeName = "ttl"
+    }
 }
 
 aws dynamodb create-table --cli-input-json ($sessionsTable | ConvertTo-Json -Depth 10) --region $REGION
@@ -118,5 +122,5 @@ Write-Host ""
 Write-Host "Tables created:" -ForegroundColor Cyan
 Write-Host "1. Users (with username-index and phoneNumber-index GSIs)"
 Write-Host "2. OTPVerifications"
-Write-Host "3. Sessions (with userId-index GSI)"
+Write-Host "3. Sessions (with userId-index GSI and TTL)"
 

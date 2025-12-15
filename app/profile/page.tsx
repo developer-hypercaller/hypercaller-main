@@ -76,7 +76,13 @@ export default function ProfilePage() {
           throw new Error("Failed to fetch profile");
         }
 
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          console.error("Error parsing profile response:", jsonError);
+          throw new Error("Invalid response from server");
+        }
         if (data.success && data.user) {
           setProfile(data.user);
           if (data.user.address) {
@@ -182,11 +188,22 @@ export default function ProfilePage() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to save location");
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (jsonError) {
+          throw new Error("Failed to save location");
+        }
+        throw new Error(errorData.error || "Failed to save location");
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Error parsing save location response:", jsonError);
+        throw new Error("Invalid response from server");
+      }
       if (data.success && data.user) {
         setProfile(data.user);
         setSuccess("Location saved successfully!");

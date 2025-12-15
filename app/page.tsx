@@ -30,10 +30,10 @@ function HomeContent() {
     const googleLogin = searchParams.get("google_login");
     const email = searchParams.get("email");
 
-    // Refetch session when user successfully logs in or registers
-    if (registered === "true" || loggedin === "true" || googleLogin === "true") {
-      refetchSession();
-    }
+    // Note: We don't need to call refetchSession() here because:
+    // 1. localStorage is already updated before redirect (in login/register pages)
+    // 2. useUserSession hook automatically checks session on mount
+    // 3. This avoids redundant API calls
     
     if (registered === "true") {
       setShowCelebration(true);
@@ -131,12 +131,10 @@ function HomeContent() {
             The ultimate platform for business discovery and networking.
           </p>
           
-          {/* Search Bar - Only for authenticated users */}
-          {user && (
+          {/* Search Bar - Available for all users */}
             <div className="mt-8">
               <BusinessSearchBar className="py-0" />
             </div>
-          )}
           
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <Button size="lg" className="text-base">

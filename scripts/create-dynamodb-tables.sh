@@ -96,6 +96,7 @@ aws dynamodb create-table \
       }
     ]" \
   --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+  --time-to-live-specification Enabled=true,AttributeName=ttl \
   --region $REGION
 
 echo "Waiting for Sessions table to be active..."
@@ -106,5 +107,5 @@ echo ""
 echo "Tables created:"
 echo "1. Users (with username-index and phoneNumber-index GSIs)"
 echo "2. OTPVerifications"
-echo "3. Sessions (with userId-index GSI)"
+echo "3. Sessions (with userId-index GSI and TTL)"
 

@@ -58,10 +58,15 @@ The application will be available at http://localhost:3000
 Comprehensive documentation is available in the [`docs/`](./docs/) directory:
 
 - **[Getting Started](./docs/getting-started.md)** - Installation and setup guide
+- **[Environment Setup Guide](./docs/env-setup-guide.md)** - Environment variables configuration (AWS, Bedrock, Redis)
 - **[API Reference](./docs/api-reference.md)** - Complete API documentation
 - **[Database Documentation](./docs/database.md)** - Database schema and setup
 - **[Architecture](./docs/architecture.md)** - Project structure and architecture
 - **[Development Guide](./docs/development.md)** - Coding standards and best practices
+- **[Troubleshooting Guide](./docs/troubleshooting.md)** - Common issues and solutions
+
+For a complete overview, see the [Documentation Index](./docs/README.md).
+
 
 ## Project Structure
 

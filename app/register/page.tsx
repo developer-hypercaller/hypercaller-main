@@ -83,7 +83,13 @@ function RegisterContent() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Error parsing username check response:", jsonError);
+        return;
+      }
       setUsernameAvailable(data.available);
       
       if (!data.available) {
@@ -139,7 +145,16 @@ function RegisterContent() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Error parsing send-otp response:", jsonError);
+        setToastMessage("Invalid response from server. Please try again.");
+        setShowToast(true);
+        setIsSendingOtp(false);
+        return;
+      }
 
       if (!response.ok) {
         setToastMessage(data.error || "Failed to send OTP");
@@ -197,7 +212,16 @@ function RegisterContent() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Error parsing verify-otp response:", jsonError);
+        setToastMessage("Invalid response from server. Please try again.");
+        setShowToast(true);
+        setIsVerifyingOtp(false);
+        return;
+      }
 
       if (!response.ok) {
         setToastMessage(data.error || "Invalid OTP. Please try again.");
@@ -296,7 +320,16 @@ function RegisterContent() {
         }),
       });
 
-      const usernameData = await usernameCheck.json();
+      let usernameData;
+      try {
+        usernameData = await usernameCheck.json();
+      } catch (jsonError) {
+        console.error("Error parsing username check response:", jsonError);
+        setToastMessage("Failed to check username availability");
+        setShowToast(true);
+        setIsLoading(false);
+        return;
+      }
 
       if (!usernameData.available) {
         setToastMessage(usernameData.message || "Username already taken");
@@ -322,7 +355,16 @@ function RegisterContent() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Error parsing registration response:", jsonError);
+        setToastMessage("Invalid response from server. Please try again.");
+        setShowToast(true);
+        setIsLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         setToastMessage(data.error || "Registration failed");

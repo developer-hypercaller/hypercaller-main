@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const { usernameExists } = require('../../../../lib/db/users');
 const { normalizeUsername } = require('../../../../lib/server-utils');
+const { rateLimiters } = require('../../../../lib/middleware/rate-limiter');
 
 export async function POST(request: NextRequest) {
+  // Rate limiting check
+  const rateLimitResponse = await rateLimiters.general(request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   try {
     const body = await request.json();
     const { username } = body;

@@ -147,6 +147,152 @@ Expected output should include:
 - `Users`
 - `OTPVerifications`
 - `Sessions`
+- `Businesses`
+- `BusinessEmbeddings`
+- `UserSearchHistory`
+- `GeocodingCache`
+
+---
+
+### Businesses Table
+
+Stores business information for the search platform.
+
+**Table Name**: `Businesses`
+
+**Primary Key**:
+- `businessId` (String) - Unique business identifier
+
+**Global Secondary Indexes (GSI)**:
+1. **category-location-index**
+   - Partition Key: `category` (String)
+   - Sort Key: `city` (String)
+   - Used for efficient category-location queries
+   - Projection: ALL
+
+2. **location-index**
+   - Partition Key: `city` (String)
+   - Sort Key: `state` (String)
+   - Used for location-based queries
+   - Projection: ALL
+
+**Attributes**:
+- `businessId` (String) - Primary key
+- `name` (String) - Business name (normalized)
+- `category` (String) - Business category (normalized)
+- `city` (String) - City name (normalized)
+- `state` (String) - State name (normalized)
+- `latitude` (Number) - Latitude coordinate
+- `longitude` (Number) - Longitude coordinate
+- `status` (String) - Business status: "active", "inactive", etc.
+- `address` (String) - Full address
+- `phone` (String) - Phone number (E.164 format)
+- `rating` (Number) - Average rating (0-5)
+- `priceRange` (String) - Price range: "$", "$$", "$$$", "$$$$"
+- `amenities` (Array) - List of amenities
+- `hours` (Object) - Business hours
+- `createdAt` (Number) - Unix timestamp
+- `updatedAt` (Number) - Unix timestamp
+
+**Provisioned Throughput**:
+- Read Capacity Units: 5
+- Write Capacity Units: 5
+
+**Note**: The `category-location-index` GSI is required for efficient search queries. See [GSI Setup](#gsi-setup) below for setup instructions.
+
+---
+
+### Other Tables
+
+Additional tables used by the application:
+- **BusinessEmbeddings**: Stores vector embeddings for semantic search
+- **UserSearchHistory**: Tracks user search queries
+- **GeocodingCache**: Caches geocoding results to reduce API calls
+
+## GSI Setup
+
+### Adding the category-location-index GSI
+
+The `category-location-index` GSI is required for efficient category-based searches. If it's missing, you can add it using one of the following methods:
+
+#### Option 1: Using Node.js Script (Recommended)
+```bash
+npm run add:category-location-gsi
+```
+
+This script will:
+1. Check if the GSI already exists
+2. Add the GSI if it's missing
+3. Wait for it to become active (up to 5 minutes)
+
+#### Option 2: Using PowerShell (Windows)
+```powershell
+.\scripts\add-category-location-index.ps1
+```
+
+#### Option 3: Using Bash (Linux/Mac)
+```bash
+./scripts/add-category-location-index.sh
+```
+
+### Verifying GSI Status
+
+Check if the GSI exists and is active:
+```bash
+npm run verify:business-gsi
+```
+
+This will show:
+- ✅ GSI exists and is ACTIVE
+- ❌ GSI does not exist (needs to be created)
+- ⚠️ GSI exists but is CREATING (wait for it to become active)
+
+### Waiting for GSI to Become Active
+
+GSI creation can take several minutes. To wait for it to become active:
+```bash
+npm run wait:gsi-active
+```
+
+This script will:
+- Check GSI status every 5 seconds
+- Wait up to 10 minutes for it to become ACTIVE
+- Show progress updates
+
+### GSI Configuration
+
+The `category-location-index` GSI has the following configuration:
+- **Index Name:** `category-location-index`
+- **Partition Key:** `category` (String)
+- **Sort Key:** `city` (String)
+- **Projection:** ALL (all attributes projected)
+- **Provisioned Throughput:**
+  - Read Capacity Units: 5
+  - Write Capacity Units: 5
+
+### Troubleshooting GSI Setup
+
+**Error:** `ResourceInUseException`
+- **Solution:** The table is being updated. Wait a few minutes and try again.
+
+**Error:** `ResourceNotFoundException`
+- **Solution:** The Businesses table doesn't exist. Create it first using the table creation scripts.
+
+**Error:** `ValidationException`
+- **Solution:** Check that the table has `category` and `city` attributes. These should be top-level attributes on business items.
+
+**GSI Status Stuck on CREATING**
+- Wait up to 10 minutes for large tables
+- Check AWS Console for any errors
+- Verify table has data (empty tables may take longer)
+- Check AWS service health status
+
+**Notes:**
+- GSI creation is **idempotent** - running the script multiple times is safe
+- The script checks if the GSI exists before creating it
+- GSI creation can take 2-5 minutes depending on table size
+- The GSI is required for efficient category-location queries
+- Without the GSI, category search will fall back to Scan (slower)
 
 ## Data Normalization
 

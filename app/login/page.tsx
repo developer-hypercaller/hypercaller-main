@@ -57,7 +57,14 @@ function LoginContent() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        setError("Invalid response from server. Please try again.");
+        setIsLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         setError(data.error || "Login failed");
@@ -74,6 +81,10 @@ function LoginContent() {
       // Redirect to home page with success parameter
       router.push("/?loggedin=true");
     } catch (error) {
+      // #region agent log
+      const errorInfo = error instanceof Error ? {errorMessage:error.message,errorName:error.name} : {errorMessage:String(error)};
+      fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/login/page.tsx:77',message:'Login form error catch',data:errorInfo,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
       console.error("Error during login:", error);
       setError("Login failed. Please try again.");
       setIsLoading(false);

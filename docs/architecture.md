@@ -10,7 +10,10 @@ Hypercaller is a modern business discovery platform built with:
 - **UI Components**: shadcn/ui
 - **Backend**: Next.js API Routes
 - **Database**: AWS DynamoDB
+- **Search**: Hybrid search with AWS Bedrock NLP and semantic embeddings
+- **Caching**: Redis (Upstash) for query caching and performance
 - **Authentication**: Custom OTP-based authentication with session management
+- **AI/ML**: AWS Bedrock for natural language processing and embeddings
 
 ## Project Structure
 
@@ -49,10 +52,60 @@ hypercaller/
 ├── hooks/                   # Custom React hooks
 │   └── use-user-session.ts
 ├── lib/                     # Utility functions and modules
+│   ├── bedrock/           # AWS Bedrock integration
+│   │   ├── bedrock-client.ts      # Bedrock client configuration
+│   │   ├── embeddings.ts          # Embedding generation
+│   │   ├── nlp.ts                 # Natural language processing
+│   │   ├── fallback-handler.ts   # Fallback logic for API failures
+│   │   └── rate-limiter.ts       # Rate limiting for API calls
+│   ├── cache/              # Caching layer
+│   │   └── redis-config.ts # Redis configuration
 │   ├── db/                 # Database operations
+│   │   ├── businesses.js   # Business CRUD operations
+│   │   ├── embeddings.js   # Embedding storage and retrieval
 │   │   ├── otp.js          # OTP management
+│   │   ├── search-history.js # Search history tracking
+│   │   ├── search-queries.js # Query caching
 │   │   ├── sessions.js     # Session management
 │   │   └── users.js        # User CRUD operations
+│   ├── search/             # Search pipeline
+│   │   ├── query-processor.ts    # Query processing and analysis
+│   │   ├── semantic-search.ts    # Semantic/vector search
+│   │   ├── keyword-search.ts     # Keyword-based search
+│   │   ├── hybrid-search.ts      # Hybrid search combining both
+│   │   ├── location-resolver.ts  # Location extraction and resolution
+│   │   ├── category-mapper.ts    # Category mapping and classification
+│   │   ├── ranking.ts            # Result ranking and relevance
+│   │   ├── filters.ts            # Search filters
+│   │   └── deduplication.ts      # Result deduplication
+│   ├── normalization/      # Data normalization
+│   │   ├── category-normalizer.ts
+│   │   ├── location-normalizer.ts
+│   │   ├── phone-normalizer.ts
+│   │   └── ... (other normalizers)
+│   ├── validation/         # Data validation
+│   │   ├── business-validator.ts
+│   │   ├── location-validator.ts
+│   │   └── ... (other validators)
+│   ├── mapping/            # Data mapping
+│   │   ├── bedrock-category-mapper.ts
+│   │   ├── bedrock-location-mapper.ts
+│   │   └── ... (other mappers)
+│   ├── monitoring/         # Monitoring and error tracking
+│   │   ├── error-tracker.ts
+│   │   └── performance-tracker.ts
+│   ├── data/               # Static data and taxonomies
+│   │   ├── categories.ts   # Category taxonomy
+│   │   ├── location-aliases.ts # Location aliases
+│   │   └── ... (other data files)
+│   ├── schemas/            # Data schemas (Zod)
+│   │   ├── business-schema.ts
+│   │   ├── search-schema.ts
+│   │   └── ... (other schemas)
+│   ├── utils/              # Utility functions
+│   │   ├── cache.ts        # Cache utilities
+│   │   ├── distance.ts     # Distance calculations
+│   │   └── ... (other utilities)
 │   ├── avatar-map.ts       # Avatar mapping
 │   ├── dynamodb.js         # DynamoDB client configuration
 │   ├── server-utils.js     # Server-side utilities
@@ -97,6 +150,8 @@ hypercaller/
 - **Request/Response**: JSON-based communication
 
 **API Endpoints**:
+
+**Authentication**:
 - `POST /api/auth/send-otp`: Send OTP to phone
 - `POST /api/auth/verify-otp`: Verify OTP code
 - `POST /api/auth/check-username`: Check username availability
@@ -105,27 +160,47 @@ hypercaller/
 - `GET /api/auth/session`: Validate session
 - `POST /api/auth/logout`: End session
 
+**Search**:
+- `POST /api/search`: Business search with NLP and semantic search
+- `POST /api/embeddings`: Generate embeddings for text
+
+**Profile**:
+- `GET /api/profile`: Get user profile
+- `PUT /api/profile`: Update user profile
+
 ### 3. Business Logic Layer
 
-**Location**: `lib/db/`, `lib/server-utils.js`
+**Location**: `lib/search/`, `lib/normalization/`, `lib/validation/`, `lib/mapping/`
 
-- **Database Operations**: Encapsulated in separate modules
+- **Search Pipeline**: Query processing, NLP analysis, semantic search, ranking
+- **Data Normalization**: Category, location, phone, and other data normalization
+- **Data Validation**: Comprehensive validation using Zod schemas
+- **Data Mapping**: Mapping between Bedrock outputs and internal data structures
 - **Business Rules**: Validation, normalization, security
-- **Utilities**: Password hashing, OTP generation, etc.
 
 **Key Modules**:
+- `lib/search/query-processor.ts`: Main query processing orchestrator
+- `lib/search/hybrid-search.ts`: Combines semantic and keyword search
+- `lib/normalization/`: Data normalization modules
+- `lib/validation/`: Data validation modules
+- `lib/mapping/`: Data mapping modules
 - `lib/db/users.js`: User CRUD operations
+- `lib/db/businesses.js`: Business CRUD operations
+- `lib/db/embeddings.js`: Embedding storage and retrieval
 - `lib/db/otp.js`: OTP generation and verification
 - `lib/db/sessions.js`: Session management
 - `lib/server-utils.js`: Server-side utilities (hashing, normalization)
 
 ### 4. Data Layer
 
-**Location**: `lib/dynamodb.js`
+**Location**: `lib/dynamodb.js`, `lib/cache/redis-config.ts`
 
 - **DynamoDB Client**: AWS SDK client configuration
 - **Connection Management**: Single client instance
 - **Region Configuration**: ap-southeast-1 (Singapore)
+- **Redis Cache**: Upstash Redis for query caching and performance
+- **Embedding Storage**: Business embeddings stored in DynamoDB
+- **Search History**: User search history tracking
 
 ## Data Flow
 
@@ -158,6 +233,33 @@ hypercaller/
 4. **Validation** → Check expiration, account status
 5. **Response** → User data or error
 
+### Search Flow
+
+1. **User Query** → Search bar component (`components/business-search-bar.tsx`)
+2. **API Request** → `POST /api/search` with query and pagination
+3. **Query Processing** → `lib/search/query-processor.ts`:
+   - Extract intent (search, question, etc.)
+   - NLP Analysis → `lib/bedrock/nlp.ts` → AWS Bedrock
+   - Category Classification → Bedrock NLP + Category Mapper
+   - Location Extraction → `lib/search/location-resolver.ts`
+   - Entity Extraction → Bedrock NLP
+4. **Embedding Generation** → `lib/bedrock/embeddings.ts` → AWS Bedrock
+5. **Hybrid Search** → `lib/search/hybrid-search.ts`:
+   - Semantic Search → `lib/search/semantic-search.ts` (vector similarity)
+   - Keyword Search → `lib/search/keyword-search.ts` (text matching)
+   - Combine and deduplicate results
+6. **Filtering** → `lib/search/filters.ts`:
+   - Category filter
+   - Location filter (radius-based)
+   - Price range filter
+   - Rating filter
+7. **Ranking** → `lib/search/ranking.ts`:
+   - Relevance scoring
+   - Distance-based ranking
+   - Rating and review count
+8. **Response** → Return paginated results to client
+9. **Caching** → Cache query embeddings and results in Redis
+
 ## Security Architecture
 
 ### Authentication
@@ -179,15 +281,18 @@ hypercaller/
 
 ### Client-Side State
 
-- **React State**: Component-level state for forms
+- **React State**: Component-level state for forms, search results, loading states
 - **Local Storage**: Session storage for authentication
 - **URL Parameters**: Query params for success messages
+- **Search State**: Query analysis, results, pagination, filters
 
 ### Server-Side State
 
 - **DynamoDB**: Single source of truth for all data
 - **Sessions**: Stored in DynamoDB with TTL
-- **No Server-Side Caching**: Direct DynamoDB queries
+- **Redis Cache**: Query embeddings, search results, geocoding results
+- **Embeddings**: Business embeddings stored in DynamoDB
+- **Search History**: User search history in DynamoDB
 
 ## Styling Architecture
 
@@ -209,9 +314,22 @@ hypercaller/
 ### Environment Variables
 
 ```env
+# AWS Configuration
 AWS_REGION=ap-southeast-1
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
+AWS_BEDROCK_REGION=ap-southeast-1
+
+# AWS Bedrock Models
+AWS_BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v1
+AWS_BEDROCK_NLP_MODEL_ID=mistral.mixtral-8x7b-instruct-v0:1
+AWS_BEDROCK_NLP_FALLBACK_MODEL_ID=mistral.mistral-large-2402-v1:0
+
+# Redis Cache
+UPSTASH_REDIS_REST_URL=https://your-redis-instance.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_token
+
+# Application
 NODE_ENV=development
 ```
 
@@ -239,19 +357,24 @@ NODE_ENV=development
 
 ## Scalability Considerations
 
-### Current Limitations
+### Current Architecture
 
-- **Single Region**: ap-southeast-1 only
-- **Provisioned Capacity**: Fixed RCU/WCU
-- **No Caching**: Direct DynamoDB queries
+- **Single Region**: ap-southeast-1 (Singapore)
+- **Caching**: Redis (Upstash) for query caching
+- **Embeddings**: 1536-dimensional embeddings stored in DynamoDB
+- **Hybrid Search**: Combines semantic (vector) and keyword search
+- **Rate Limiting**: Built-in rate limiting for Bedrock API calls
+- **Fallback Handling**: Automatic fallback to secondary NLP model
 
 ### Future Improvements
 
 1. **Multi-Region**: DynamoDB Global Tables
-2. **Caching**: Redis for session caching
+2. **Enhanced Caching**: More aggressive caching strategies
 3. **CDN**: Static asset delivery
 4. **Load Balancing**: Multiple server instances
 5. **Auto Scaling**: DynamoDB on-demand or auto-scaling
+6. **Search Analytics**: Track search patterns and optimize
+7. **Personalization**: User-specific search ranking
 
 ## Technology Stack
 
@@ -265,14 +388,25 @@ NODE_ENV=development
 
 ### Backend
 - **Next.js API Routes**: Serverless API
-- **AWS SDK**: DynamoDB client
+- **AWS SDK**: DynamoDB and Bedrock clients
+- **AWS Bedrock**: NLP and embedding generation
+- **Redis (Upstash)**: Query caching and performance
 - **bcryptjs**: Password hashing
 - **uuid**: Unique ID generation
+- **Zod**: Schema validation
 
 ### Database
 - **AWS DynamoDB**: NoSQL database
 - **TTL**: Automatic expiration
 - **GSI**: Global Secondary Indexes for queries
+- **Embeddings**: Vector embeddings stored in DynamoDB
+- **Search History**: User search history tracking
+
+### AI/ML
+- **AWS Bedrock**: Natural language processing and embeddings
+- **Embedding Model**: amazon.titan-embed-text-v1 (1536 dimensions)
+- **NLP Model**: mistral.mixtral-8x7b-instruct-v0:1 (primary)
+- **NLP Fallback**: mistral.mistral-large-2402-v1:0
 
 ## Development Workflow
 

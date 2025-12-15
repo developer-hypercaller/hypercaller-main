@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         address: user.address || null,
         latitude: user.latitude || null,
         longitude: user.longitude || null,
+        locationLastUpdated: user.locationLastUpdated || null,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
       },
@@ -153,6 +154,7 @@ export async function PUT(request: NextRequest) {
         address: updatedUser.address || null,
         latitude: updatedUser.latitude || null,
         longitude: updatedUser.longitude || null,
+        locationLastUpdated: updatedUser.locationLastUpdated || null,
       },
     });
   } catch (error) {
