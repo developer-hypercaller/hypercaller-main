@@ -12,6 +12,8 @@ import {
 } from "../../../../lib/db/embedding-status";
 import { getEmbeddingQueue } from "../../../../lib/queue/embedding-queue";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET handler - Get embedding status
  */

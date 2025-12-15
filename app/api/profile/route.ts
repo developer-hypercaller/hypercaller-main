@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const { validateSession } = require('../../../lib/db/sessions');
 const { getUserById, updateUserProfile } = require('../../../lib/db/users');
 const { getUserPreferredCategories, replaceUserPreferredCategories } = require('../../../lib/db/user-preferred-categories');
@@ -10,20 +12,38 @@ const { reverseGeocode, forwardGeocode } = require('../../../lib/geocoding');
  * Get current user's profile
  */
 export async function GET(request: NextRequest) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:12',message:'Profile GET entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   try {
     const sessionId = request.headers.get('x-session-id') || 
                      request.cookies.get('sessionId')?.value;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:14',message:'After extract sessionId',data:{hasSessionId:!!sessionId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     if (!sessionId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:17',message:'No sessionId branch',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return NextResponse.json(
         { error: 'Session ID required' },
         { status: 401 }
       );
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:24',message:'Before validateSession',data:{sessionId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     const result = await validateSession(sessionId);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:26',message:'After validateSession',data:{valid:result.valid,userId:result.session?.userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     if (!result.valid) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:27',message:'Invalid session branch',data:{error:result.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return NextResponse.json(
         { error: result.error },
         { status: 401 }
@@ -31,12 +51,21 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = result.session.userId;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:34',message:'Before getUserById and getUserPreferredCategories',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     const [user, preferredCategories] = await Promise.all([
       getUserById(userId),
       getUserPreferredCategories(userId),
     ]);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:39',message:'After getUserById and getUserPreferredCategories',data:{hasUser:!!user,hasCategories:!!preferredCategories},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     if (!user) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:39',message:'User not found branch',data:{userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -64,6 +93,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    // #region agent log
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorName = error instanceof Error ? error.name : 'Unknown';
+    fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/profile/route.ts:66',message:'Profile GET catch error',data:{errorMessage:errorMsg,errorName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     console.error('Error getting profile:', error);
     return NextResponse.json(
       { error: 'Failed to get profile' },
