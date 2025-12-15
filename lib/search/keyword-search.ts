@@ -756,10 +756,9 @@ export async function searchBusinesses(
             }
           }
         } else {
-          // If no city filter, search without city (returns all cities)
-          const categoryResults = await searchBusinessesByCategory(
+          // If no city filter, search across all cities
+          const categoryResults = await searchBusinessesByCategoryOnly(
             category,
-            undefined,
             limit * 2,
             0
           );

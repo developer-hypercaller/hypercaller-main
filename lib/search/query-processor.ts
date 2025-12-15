@@ -40,6 +40,7 @@ import { normalizeBusinessName } from "../normalization/name-normalizer";
 import { normalizeLocationName, normalizeCity } from "../normalization/location-normalizer";
 import { normalizeCategory } from "../normalization/category-normalizer";
 import { normalizePriceRange } from "../normalization/price-range-normalizer";
+import { PriceRange } from "../data/price-ranges";
 
 // Validators
 import { validateBusinessName } from "../validation/name-validator";
@@ -160,10 +161,10 @@ async function checkCache(query: string, filters: SearchFilters): Promise<{
 
   try {
     // Check for cached results (most complete)
-    const cachedResults = await get<Business[]>(`${cacheKey}:results`);
+    const cachedResults = (await get(`${cacheKey}:results`)) as Business[] | null;
     if (cachedResults) {
-      const cachedAnalysis = await get<QueryAnalysis>(`${cacheKey}:analysis`);
-      const cachedEmbedding = await get<number[]>(`${cacheKey}:embedding`);
+      const cachedAnalysis = (await get(`${cacheKey}:analysis`)) as QueryAnalysis | null;
+      const cachedEmbedding = (await get(`${cacheKey}:embedding`)) as number[] | null;
       return {
         analysis: cachedAnalysis || undefined,
         embedding: cachedEmbedding || undefined,
@@ -172,8 +173,8 @@ async function checkCache(query: string, filters: SearchFilters): Promise<{
     }
 
     // Check for cached analysis
-    const cachedAnalysis = await get<QueryAnalysis>(`${cacheKey}:analysis`);
-    const cachedEmbedding = await get<number[]>(`${cacheKey}:embedding`);
+    const cachedAnalysis = (await get(`${cacheKey}:analysis`)) as QueryAnalysis | null;
+    const cachedEmbedding = (await get(`${cacheKey}:embedding`)) as number[] | null;
 
     if (cachedAnalysis && cachedEmbedding) {
       return {
@@ -251,6 +252,22 @@ function detectCategoryFromKeywords(query: string): string | undefined {
 }
 
 /**
+ * Build EntityResult-compatible fallback entities
+ */
+function getEntityFallback(query?: string): EntityResult {
+  const fallback = getFallbackEntities(query);
+  return {
+    locations: fallback.locations || [],
+    businessNames: fallback.businessNames || [],
+    categories: fallback.categories || [],
+    times: [],
+    prices: fallback.priceRange || [],
+    features: [],
+    confidence: 0.2,
+  };
+}
+
+/**
  * Step 4: Run Bedrock NLP analysis with rate limiting and fallbacks
  */
 async function runNLPAnalysis(
@@ -274,7 +291,7 @@ async function runNLPAnalysis(
       // Use fallback immediately
       return {
         intent: "search",
-        entities: getFallbackEntities(query),
+        entities: getEntityFallback(query),
       };
     }
 
@@ -283,7 +300,7 @@ async function runNLPAnalysis(
       // Use fallback immediately
       return {
         intent: "search",
-        entities: getFallbackEntities(query),
+        entities: getEntityFallback(query),
       };
     }
 
@@ -302,7 +319,7 @@ async function runNLPAnalysis(
             }
           );
         },
-        () => getFallbackEntities(query),
+        () => getEntityFallback(query),
         { logError: true, fallbackType: "nlp_entities" }
       ),
       withFallback(
@@ -405,7 +422,7 @@ async function runNLPAnalysis(
     console.error(`[QueryProcessor] NLP analysis failed: ${error.message}`);
     return {
       intent: "search",
-      entities: getFallbackEntities(query),
+      entities: getEntityFallback(query),
     };
   }
 }
@@ -416,14 +433,14 @@ async function runNLPAnalysis(
 function extractAndNormalizeEntities(entities: EntityResult): {
   locations: string[];
   businessNames: string[];
-  prices: string[];
+  prices: PriceRange[];
   times: string[];
   features: string[];
 } {
   const normalized: {
     locations: string[];
     businessNames: string[];
-    prices: string[];
+    prices: PriceRange[];
     times: string[];
     features: string[];
   } = {
@@ -449,10 +466,10 @@ function extractAndNormalizeEntities(entities: EntityResult): {
   }
 
   // Normalize prices
-  if (entities.priceRange) {
-    normalized.prices = entities.priceRange
+  if (entities.prices) {
+    normalized.prices = entities.prices
       .map((price) => normalizePriceRange(price))
-      .filter((price): price is string => !!price);
+      .filter((price): price is PriceRange => price !== null);
   }
 
   // Extract times (if available in entities)
@@ -760,10 +777,10 @@ function applyFilters(
   }
 
   // Apply price filter
-  if (filters.priceRange) {
+  if (filters.priceRange?.values && filters.priceRange.values.length > 0) {
     filtered = filtered.filter((b) => {
       if (!b.priceRange) return false;
-      return filters.priceRange === b.priceRange;
+      return filters.priceRange!.values.includes(b.priceRange);
     });
   }
 
@@ -1017,7 +1034,7 @@ export async function processQuery(
       errors.push(`NLP analysis failed, using fallback: ${error.message}`);
       nlpResult = {
         intent: "search",
-        entities: getFallbackEntities(sanitizedQuery),
+        entities: getEntityFallback(sanitizedQuery),
       };
       stepPerformance.push({
         step: "4. NLP analysis (fallback)",
@@ -1029,7 +1046,7 @@ export async function processQuery(
     if (!nlpResult) {
       nlpResult = {
         intent: "search",
-        entities: getFallbackEntities(sanitizedQuery),
+        entities: getEntityFallback(sanitizedQuery),
       };
     }
 
@@ -1134,7 +1151,7 @@ export async function processQuery(
         const { searchBusinessesByName } = await import("./keyword-search");
         // Extract business keywords from query (remove location keywords)
         // Use business names from entities if available, otherwise use the query
-        const businessKeywords = normalizedEntities.businessNames.length > 0
+        const businessKeywords = normalizedEntities && normalizedEntities.businessNames.length > 0
           ? normalizedEntities.businessNames.join(" ")
           : sanitizedQuery.split(/\s+(?:in|near|at|around)\s+/i)[0].trim() || sanitizedQuery;
         const keywordResults = await searchBusinessesByName(businessKeywords, filters.limit || 20, 0, true);
@@ -1210,7 +1227,7 @@ export async function processQuery(
       results: [],
       analysis: {
         intent: "search",
-        entities: getFallbackEntities(query),
+        entities: getEntityFallback(query),
       },
       performance: {
         responseTime: Date.now() - startTime,

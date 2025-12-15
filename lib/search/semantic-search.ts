@@ -175,7 +175,7 @@ export async function semanticSearch(
           
           // Fetch businesses to filter by category (batch fetch)
           const { getBusinessById } = require("../db/businesses");
-          const businessPromises = allBusinessIds.slice(0, 50).map(id => getBusinessById(id));
+          const businessPromises = allBusinessIds.slice(0, 50).map((id: string) => getBusinessById(id));
           const businesses = (await Promise.all(businessPromises)).filter(Boolean);
           
           // Filter by category

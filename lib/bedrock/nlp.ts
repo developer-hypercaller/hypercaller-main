@@ -5,7 +5,7 @@
 
 import { getBedrockClient, getNLPModelIdentifier, getNLPFallbackModelID } from "./bedrock-client";
 import { InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-import { mapBedrockCategory } from "../mapping/bedrock-category-mapper";
+import { mapBedrockCategory, BedrockCategoryMappingResult } from "../mapping/bedrock-category-mapper";
 import { getAllCategories } from "../data/categories";
 import { normalizeBusinessName } from "../normalization/name-normalizer";
 import { normalizePriceRange } from "../normalization/price-range-normalizer";
@@ -570,8 +570,8 @@ Return only a JSON object in this format:
         // Map alternatives
         const mappedAlternatives = alternatives
           .map((alt: string) => mapBedrockCategory(alt, confidence * 0.8))
-          .filter((result) => result.categoryId !== "general" && result.categoryId !== categoryId)
-          .map((result) => result.categoryId)
+          .filter((result: BedrockCategoryMappingResult) => result.categoryId !== "general" && result.categoryId !== categoryId)
+          .map((result: BedrockCategoryMappingResult) => result.categoryId)
           .slice(0, 3); // Max 3 alternatives
 
         // Return "general" if confidence too low
@@ -634,6 +634,7 @@ export interface EntityResult {
   times: string[]; // "now", "tonight", "open now"
   prices: string[]; // "budget", "cheap", "expensive"
   features: string[]; // "pet-friendly", "wifi", etc.
+  categories?: string[];
   confidence: number;
 }
 
@@ -653,6 +654,7 @@ export async function extractEntities(query: string): Promise<EntityResult> {
       times: [],
       prices: [],
       features: [],
+      categories: [],
       confidence: 0.0,
     };
   }

@@ -427,10 +427,11 @@ export async function generateQueryEmbedding(query: string): Promise<number[]> {
       throw new Error(errorMsg);
     }
 
-    // Store in cache (async, don't wait)
-    saveCachedEmbedding(normalizedQuery, result.embedding, result.modelId).catch((error) => {
-      console.error(`[Embeddings] Failed to cache embedding: ${error.message}`);
-    });
+  // Store in cache (async, don't wait)
+  saveCachedEmbedding(normalizedQuery, result.embedding, result.modelId).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[Embeddings] Failed to cache embedding: ${message}`);
+  });
 
     return result.embedding;
   } catch (error: any) {
@@ -541,10 +542,11 @@ export async function generateBusinessEmbedding(business: Business): Promise<num
 
     // Store in database (async, don't wait)
     // Use model ID as version identifier - matches CURRENT_EMBEDDING_VERSION
-    const embeddingVersion = getCurrentEmbeddingVersion();
-    saveEmbedding(business.businessId, result.embedding, embeddingVersion, textContent).catch((error) => {
-      console.error(`[Embeddings] Failed to save business embedding: ${error.message}`);
-    });
+  const embeddingVersion = getCurrentEmbeddingVersion();
+  saveEmbedding(business.businessId, result.embedding, embeddingVersion, textContent).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[Embeddings] Failed to save business embedding: ${message}`);
+  });
 
     // Update business with embedding version
     // Note: This would typically be done in the business update API
