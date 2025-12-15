@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { validateSessionOptional } from "../../../lib/middleware/auth";
+import { recordSearchHistory } from "../../../lib/db/search-history";
 import { processQuery } from "../../../lib/search/query-processor";
 import { detectNearMeKeywords } from "../../../lib/search/location-resolver";
 
@@ -545,7 +546,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 8. Return response
+    // 8. Fire-and-forget search history for authenticated users
+    if (userId && searchRequest.query) {
+      recordSearchHistory(userId, {
+        query: searchRequest.query,
+        filters: searchRequest.filters || {},
+        location: response.location || {},
+        resultCount: response.pagination?.total || 0,
+      }).catch((err: any) => console.error("Failed to record search history:", err));
+    }
+
+    // 9. Return response
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     // #region agent log
@@ -555,13 +566,20 @@ export async function POST(request: NextRequest) {
     // #endregion
     // Log actual error for debugging
     console.error("Search API error:", error);
+    console.error("Search API error details:", {
+      message: error.message,
+      name: error.name,
+      stack: error.stack?.substring(0, 500),
+    });
     const errorMessage = error.message || String(error);
 
     return NextResponse.json(
       {
         success: false,
         query: typeof query !== "undefined" ? query : "",
-        error: "Internal server error. Please try again.",
+        error: errorMessage.includes("Cannot read") || errorMessage.includes("undefined") 
+          ? "Search service error. Please try again." 
+          : "Internal server error. Please try again.",
         errorCode: "INTERNAL_ERROR",
         performance: {
           responseTime: Date.now() - startTime,

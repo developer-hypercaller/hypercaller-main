@@ -2,7 +2,7 @@
 
 import { CheckCircle2, XCircle, Info, X } from "lucide-react";
 import { Button } from "./button";
-import { useToast, type Toast as ToastType } from "@/hooks/use-toast";
+import { useToast } from "@/components/toast-provider";
 
 export function ToastContainer() {
   const { toasts, removeToast } = useToast();

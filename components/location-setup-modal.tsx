@@ -47,7 +47,7 @@ export function LocationSetupModal({ isOpen, onClose, onLocationSet }: LocationS
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           reject(new Error("TIMEOUT"));
-        }, 15000); // 15 seconds timeout
+        }, 10000); // 10 seconds timeout
 
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -59,9 +59,10 @@ export function LocationSetupModal({ isOpen, onClose, onLocationSet }: LocationS
             reject(err);
           },
           {
-            enableHighAccuracy: true,
-            timeout: 15000, // 15 seconds
-            maximumAge: 60000, // Accept cached location up to 1 minute old
+            // Prefer faster, cached fixes to avoid slow high-accuracy locks
+            enableHighAccuracy: false,
+            timeout: 8000,
+            maximumAge: 120000, // Accept cached location up to 2 minutes old
           }
         );
       });
@@ -115,6 +116,7 @@ export function LocationSetupModal({ isOpen, onClose, onLocationSet }: LocationS
       } else if (error.code === 3) {
         // TIMEOUT
         setGeolocationError("Location request timed out. Please try again or enter your location manually.");
+        setMode("manual");
       } else if (error.message) {
         setGeolocationError(error.message);
       } else {

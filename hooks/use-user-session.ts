@@ -23,18 +23,22 @@ export function useUserSession(): UseUserSessionReturn {
   const [isLoading, setIsLoading] = useState(true);
 
   const checkSession = async () => {
-    setIsLoading(true);
     try {
       const sessionId = localStorage.getItem("sessionId");
       const storedUser = localStorage.getItem("user");
 
       if (!sessionId || !storedUser) {
         setUser(null);
-        setIsLoading(false);
         return;
       }
 
-      // Validate session with server
+      // Optimistically use cached user for faster UI, then validate in background
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        setUser(null);
+      }
+
       const response = await fetch("/api/auth/session", {
         method: "GET",
         headers: {
@@ -44,25 +48,18 @@ export function useUserSession(): UseUserSessionReturn {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.session) {
-          // Parse user from localStorage
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } else {
-          // Session invalid, clear storage
+        if (!(data.success && data.session)) {
           localStorage.removeItem("sessionId");
           localStorage.removeItem("user");
           setUser(null);
         }
       } else {
-        // Session invalid, clear storage
         localStorage.removeItem("sessionId");
         localStorage.removeItem("user");
         setUser(null);
       }
     } catch (error) {
       console.error("Error checking session:", error);
-      // On error, try to use stored user data
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         try {
@@ -79,6 +76,21 @@ export function useUserSession(): UseUserSessionReturn {
   };
 
   useEffect(() => {
+    // Bootstrap quickly from cache, then validate in background
+    const sessionId = localStorage.getItem("sessionId");
+    const storedUser = localStorage.getItem("user");
+    if (sessionId && storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        setUser(null);
+      }
+      setIsLoading(false);
+    } else {
+      setUser(null);
+      setIsLoading(false);
+    }
+
     checkSession();
 
     // Listen for storage changes (e.g., login/logout in another tab)

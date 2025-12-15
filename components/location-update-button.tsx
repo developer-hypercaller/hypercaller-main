@@ -94,15 +94,12 @@ export function LocationUpdateButton({
     try {
       // Request current location
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-          }
-        );
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          // Use a quick cached fix first; avoid long GPS locks on desktop
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 120000,
+        });
       });
 
       const { latitude, longitude } = position.coords;
@@ -164,6 +161,7 @@ export function LocationUpdateButton({
       } else if (err.code === 3) {
         // TIMEOUT
         errorMessage = "Location request timed out. Please try again or use manual entry.";
+        setShowManualModal(true);
       }
 
       setToastMessage(errorMessage);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const { validateSession } = require('../../../lib/db/sessions');
 const { getUserById, updateUserProfile } = require('../../../lib/db/users');
+const { getUserPreferredCategories, replaceUserPreferredCategories } = require('../../../lib/db/user-preferred-categories');
 const { reverseGeocode, forwardGeocode } = require('../../../lib/geocoding');
 
 /**
@@ -30,7 +31,10 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = result.session.userId;
-    const user = await getUserById(userId);
+    const [user, preferredCategories] = await Promise.all([
+      getUserById(userId),
+      getUserPreferredCategories(userId),
+    ]);
 
     if (!user) {
       return NextResponse.json(
@@ -56,6 +60,7 @@ export async function GET(request: NextRequest) {
         locationLastUpdated: user.locationLastUpdated || null,
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
+        preferredCategories,
       },
     });
   } catch (error) {
@@ -94,7 +99,17 @@ export async function PUT(request: NextRequest) {
 
     const userId = result.session.userId;
     const body = await request.json();
-    const { address, latitude, longitude, useCurrentLocation, manualAddress } = body;
+    const {
+      address,
+      latitude,
+      longitude,
+      useCurrentLocation,
+      manualAddress,
+      firstName,
+      lastName,
+      avatar,
+      preferredCategories,
+    } = body;
 
     let updateData: any = {};
 
@@ -137,8 +152,22 @@ export async function PUT(request: NextRequest) {
       if (longitude !== undefined) updateData.longitude = longitude;
     }
 
+    // Handle name/avatar updates
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (avatar !== undefined) updateData.avatar = avatar;
+
     // Update user profile
     const updatedUser = await updateUserProfile(userId, updateData);
+
+    // Update preferred categories if provided as an array
+    if (Array.isArray(preferredCategories)) {
+      await replaceUserPreferredCategories(userId, preferredCategories, "manual");
+    }
+
+    const updatedPreferredCategories = Array.isArray(preferredCategories)
+      ? preferredCategories
+      : await getUserPreferredCategories(userId);
 
     return NextResponse.json({
       success: true,
@@ -155,6 +184,7 @@ export async function PUT(request: NextRequest) {
         latitude: updatedUser.latitude || null,
         longitude: updatedUser.longitude || null,
         locationLastUpdated: updatedUser.locationLastUpdated || null,
+        preferredCategories: updatedPreferredCategories,
       },
     });
   } catch (error) {

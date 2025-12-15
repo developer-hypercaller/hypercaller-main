@@ -16,6 +16,9 @@ Project structure, architecture layers, data flow, security architecture, and te
 ### [API Reference](./api-reference.md)
 Comprehensive documentation of all API endpoints including request/response formats, error handling, and security considerations.
 
+### [Components Documentation](./components.md)
+Complete documentation of all React components including props, usage examples, features, and implementation details.
+
 ### [Database Documentation](./database.md)
 Detailed database schema, table structures, indexes, TTL configuration, GSI setup, and setup instructions.
 
@@ -35,7 +38,8 @@ Comprehensive documentation of all major challenges encountered during developme
 
 - **New to the project?** Start with [Getting Started](./getting-started.md)
 - **Setting up environment?** See [Environment Setup Guide](./env-setup-guide.md)
-- **Building features?** Check [API Reference](./api-reference.md) and [Architecture](./architecture.md)
+- **Building features?** Check [API Reference](./api-reference.md), [Components Documentation](./components.md), and [Architecture](./architecture.md)
+- **Working with components?** See [Components Documentation](./components.md)
 - **Setting up database?** See [Database Documentation](./database.md) (includes GSI setup)
 - **Writing tests?** See [Testing Guide](./testing-guide.md)
 - **Encountering issues?** Check [Troubleshooting Guide](./troubleshooting.md)
@@ -47,7 +51,7 @@ Comprehensive documentation of all major challenges encountered during developme
 The documentation is organized by topic:
 - **Setup & Configuration**: Getting Started, Environment Setup
 - **Architecture & Design**: Architecture, Database
-- **Development**: API Reference, Development Guide, Testing Guide, Development Journey
+- **Development**: API Reference, Components Documentation, Development Guide, Testing Guide, Development Journey
 - **Support**: Troubleshooting
 
 ## Additional Resources

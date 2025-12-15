@@ -132,7 +132,7 @@ export function SearchResults({
             showUpdateButton={false}
           />
         )}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           {[...Array(6)].map((_, i) => (
             <BusinessCardSkeleton key={i} />
           ))}
@@ -224,7 +224,7 @@ export function SearchResults({
       )}
 
       {/* Results Count */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           Found {pagination.total} result{pagination.total !== 1 ? "s" : ""}
         </p>
@@ -243,17 +243,18 @@ export function SearchResults({
         });
         
         return (
-          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
             {uniqueResults.map((business) => (
-              <BusinessCard
-                key={business.businessId}
-                business={business}
-                onClick={() => {
-                  if (onBusinessClick) {
-                    onBusinessClick(business);
-                  }
-                }}
-              />
+              <div key={business.businessId} className="min-w-0 w-full">
+                <BusinessCard
+                  business={business}
+                  onClick={() => {
+                    if (onBusinessClick) {
+                      onBusinessClick(business);
+                    }
+                  }}
+                />
+              </div>
             ))}
           </div>
         );
@@ -262,7 +263,7 @@ export function SearchResults({
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 border-t border-border/50">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-center">
             <Button
               variant="outline"
               size="sm"

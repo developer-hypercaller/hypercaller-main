@@ -5,9 +5,12 @@ import { useEffect } from "react";
 export function ConfettiCelebration() {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
+    let cancelled = false;
     
     // Dynamically import confetti to avoid SSR issues
-    import("canvas-confetti").then((confettiModule) => {
+    import("canvas-confetti")
+      .then((confettiModule) => {
+        if (cancelled) return;
       const confetti = confettiModule.default;
       
       const duration = 3000;
@@ -42,10 +45,16 @@ export function ConfettiCelebration() {
           origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
         });
       }, 250);
+      })
+      .catch((err) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("Confetti failed to load; skipping animation.", err);
+        }
     });
 
     // Cleanup function
     return () => {
+      cancelled = true;
       if (interval) {
         clearInterval(interval);
       }

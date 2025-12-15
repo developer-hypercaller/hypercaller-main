@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
-import { Search, Loader2, Filter, X, Sparkles, Info } from "lucide-react";
+import { useState, FormEvent, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
+import { Search, Loader2, Filter, X, Sparkles, Info, Wand2, MapPin, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchResults } from "./search-results";
@@ -89,19 +90,28 @@ interface SearchResponse {
   partialResults?: boolean;
 }
 
+export interface SearchSummary {
+  query: string;
+  resultCount: number;
+  timestamp: number;
+}
+
 interface BusinessSearchBarProps {
   className?: string;
   onBusinessClick?: (business: Business) => void;
   showResults?: boolean; // Whether to show results below the search bar
+  onSearchComplete?: (summary: SearchSummary) => void;
 }
 
 export function BusinessSearchBar({ 
   className, 
   onBusinessClick,
   showResults = true,
+  onSearchComplete,
 }: BusinessSearchBarProps) {
-  const { user } = useUserSession();
+  const { user, isLoading: isSessionLoading } = useUserSession();
   const { success, error: showErrorToast } = useToast();
+  const isLocked = !user?.userId && !isSessionLoading;
   
   // User location state
   const [userLocation, setUserLocation] = useState<{
@@ -124,6 +134,8 @@ export function BusinessSearchBar({
     hasMore: false,
   });
   const [locationInfo, setLocationInfo] = useState<SearchResponse["location"] | undefined>();
+  const [activeLocationLabel, setActiveLocationLabel] = useState<string | null>(null);
+  const [activeLocationRaw, setActiveLocationRaw] = useState<string | null>(null);
   const [queryAnalysis, setQueryAnalysis] = useState<SearchResponse["analysis"] | undefined>();
   const [showQueryAnalysis, setShowQueryAnalysis] = useState(false);
   const [isProcessingSemantic, setIsProcessingSemantic] = useState(false);
@@ -136,11 +148,51 @@ export function BusinessSearchBar({
   // Location setup modal state
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [pendingSearchQuery, setPendingSearchQuery] = useState<string | null>(null);
+  
+  // Animation state
+  const [isTyping, setIsTyping] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Handle typing animation (subtle)
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    setIsTyping(true);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+    }, 400);
+  };
+  
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-rerun support: execute pending rerun query stored in localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pending = localStorage.getItem("pendingRerunQuery");
+    if (pending) {
+      localStorage.removeItem("pendingRerunQuery");
+      setSearchQuery(pending);
+      performSearch(pending, 1);
+    }
+  }, []);
 
   /**
    * Perform search
    */
   const performSearch = async (query: string, page: number = 1) => {
+    if (isLocked) return;
+
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/business-search-bar.tsx:143',message:'performSearch entry',data:{query,page},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     // #endregion
@@ -252,7 +304,8 @@ export function BusinessSearchBar({
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/92723b57-559c-471f-a88e-e1218b2e558e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/business-search-bar.tsx:234',message:'Search success',data:{resultCount:data.results?.length,total:data.pagination?.total},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
       // #endregion
-      setResults(data.results || []);
+      const nextResults = data.results || [];
+      setResults(nextResults);
       setPagination(data.pagination || {
         page: 1,
         totalPages: 1,
@@ -268,6 +321,30 @@ export function BusinessSearchBar({
       // Show query analysis if available
       if (data.analysis) {
         setShowQueryAnalysis(true);
+      }
+
+      // Notify parent about completed search for recent searches UI
+      onSearchComplete?.({
+        query: requestBody.query,
+        resultCount: nextResults.length ?? 0,
+        timestamp: Date.now(),
+      });
+
+      // Persist search history for authenticated users (non-blocking)
+      if (sessionId) {
+        fetch("/api/search/history", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-session-id": sessionId,
+          },
+          body: JSON.stringify({
+            query: requestBody.query,
+            filters: requestBody.filters || {},
+            location: data.location || {},
+            resultCount: data.pagination?.total || nextResults.length || 0,
+          }),
+        }).catch((err) => console.error("Failed to persist search history", err));
       }
 
       // Show success message if partial results
@@ -315,6 +392,7 @@ export function BusinessSearchBar({
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isLocked) return;
     console.log("[BusinessSearchBar] handleSubmit called, searchQuery:", searchQuery);
     
     if (!searchQuery || !searchQuery.trim()) {
@@ -329,6 +407,7 @@ export function BusinessSearchBar({
    * Handle search button click (alternative trigger)
    */
   const handleSearchClick = async () => {
+    if (isLocked) return;
     console.log("[BusinessSearchBar] handleSearchClick called, searchQuery:", searchQuery);
     
     if (!searchQuery || !searchQuery.trim()) {
@@ -349,8 +428,46 @@ export function BusinessSearchBar({
   /**
    * Handle location updated
    */
+  const fetchUserLocation = useCallback(async () => {
+    if (!user?.userId) {
+      setUserLocation(null);
+      return;
+    }
+
+    try {
+      const sessionId = localStorage.getItem("sessionId");
+      if (!sessionId) {
+        setUserLocation(null);
+        return;
+      }
+
+      const response = await fetch("/api/profile", {
+        method: "GET",
+        headers: {
+          "x-session-id": sessionId,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          setUserLocation({
+            address: data.user.address || undefined,
+            latitude: data.user.latitude || undefined,
+            longitude: data.user.longitude || undefined,
+            locationLastUpdated: data.user.locationLastUpdated || null,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user location:", error);
+      setUserLocation(null);
+    }
+  }, [user?.userId]);
+
   const handleLocationUpdated = async () => {
     success("Location updated successfully!");
+    await fetchUserLocation();
     
     // If there's a pending "near me" search, retry it
     if (pendingSearchQuery) {
@@ -378,91 +495,157 @@ export function BusinessSearchBar({
    * Fetch user location from profile
    */
   useEffect(() => {
-    const fetchUserLocation = async () => {
-      if (!user?.userId) {
-        setUserLocation(null);
-        return;
+    fetchUserLocation();
+  }, [fetchUserLocation]);
+
+  useEffect(() => {
+    const formatLocationLabel = (label: string) => {
+      // Prefer a concise two-part label; fallback to truncated string
+      const parts = label.split(",").map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        return `${parts[0]}, ${parts[1]}`.slice(0, 60);
       }
-
-      try {
-        const sessionId = localStorage.getItem("sessionId");
-        if (!sessionId) {
-          setUserLocation(null);
-          return;
-        }
-
-        const response = await fetch("/api/profile", {
-          method: "GET",
-          headers: {
-            "x-session-id": sessionId,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.user) {
-            setUserLocation({
-              address: data.user.address || undefined,
-              latitude: data.user.latitude || undefined,
-              longitude: data.user.longitude || undefined,
-              locationLastUpdated: data.user.locationLastUpdated || null,
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user location:", error);
-        setUserLocation(null);
-      }
+      return label.length > 60 ? `${label.slice(0, 57)}...` : label;
     };
 
-    fetchUserLocation();
-  }, [user?.userId]);
+    const raw = locationInfo?.used || userLocation?.address || null;
+    setActiveLocationRaw(raw);
+    setActiveLocationLabel(raw ? formatLocationLabel(raw) : null);
+  }, [locationInfo?.used, userLocation?.address]);
 
   return (
-    <div className={cn("w-full space-y-4", className)}>
-      {/* Search Form */}
-      <form onSubmit={handleSubmit} className="relative">
-        <div className="relative flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 h-5 w-5 text-muted-foreground pointer-events-none top-1/2 -translate-y-1/2" />
-            <Input
-              type="text"
-              placeholder="Search for businesses, industries, locations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                // Allow Enter key to submit form
-                if (e.key === "Enter" && searchQuery.trim()) {
-                  console.log("[BusinessSearchBar] Enter key pressed in input");
-                  // Form submission will be handled by handleSubmit
-                }
-              }}
-              className="pl-12 pr-32 h-14 text-base rounded-lg border-2 border-input/50 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0 focus-visible:border-primary/30"
-              disabled={loading}
-            />
-            <Button
-              type="submit"
-              size="lg"
-              className="absolute right-2 h-10 px-6 rounded-md"
-              disabled={loading || !searchQuery.trim()}
-              onClick={(e) => {
-                // Ensure form submission happens even if button is clicked directly
-                if (!searchQuery.trim()) {
-                  e.preventDefault();
-                  return;
-                }
-                console.log("[BusinessSearchBar] Search button clicked");
-              }}
+    <div className={cn("w-full relative", className, isLocked && "group")}>
+      {isLocked && (
+        <div className="pointer-events-none group-hover:pointer-events-auto absolute inset-0 z-30 rounded-2xl bg-background/90 backdrop-blur-md border border-dashed border-primary/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center text-center px-4 gap-3">
+          <div className="text-sm font-semibold text-primary">Sign up or log in to start searching</div>
+          <p className="text-xs text-muted-foreground">It takes under 5 seconds to unlock search and results.</p>
+          <div className="flex gap-2">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                "Search"
+              Create account
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className={cn("space-y-4", isLocked && "blur-[2px] pointer-events-none")}>
+        {/* Search Form */}
+        <form onSubmit={handleSubmit} className="relative">
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center">
+            {/* Animated Search Bar Wrapper (toned down) */}
+            <div 
+              className={cn(
+                "search-bar-wrapper relative flex-1 group",
+                isFocused && "active",
+                isTyping && "typing",
+                loading && "active",
+                isLocked && "cursor-not-allowed"
               )}
-            </Button>
+            >
+            {/* Locked overlay on hover */}
+            {isLocked && (
+              <div className="pointer-events-auto absolute inset-0 z-20 rounded-xl bg-background/85 backdrop-blur-md border border-dashed border-primary/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center text-center px-4 gap-3">
+                <div className="text-sm font-medium text-primary">Sign up or log in to start searching</div>
+                <p className="text-xs text-muted-foreground">
+                  It takes under 5 seconds to unlock search and results.
+                </p>
+                <div className="flex gap-2">
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"
+                  >
+                    Create account
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            <div className="relative">
+              {/* Animated Search Icon */}
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10 flex items-center justify-center h-5 w-5">
+                {loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary flex-shrink-0" />
+                ) : isTyping ? (
+                  <Wand2 className={cn(
+                    "h-5 w-5 text-primary flex-shrink-0 transition-colors duration-300",
+                    "search-icon-animated active"
+                  )} />
+                ) : (
+                  <Search className={cn(
+                    "h-5 w-5 transition-colors duration-300 flex-shrink-0",
+                    isFocused ? "text-primary" : "text-muted-foreground"
+                  )} />
+                )}
+              </div>
+              
+              <Input
+                type="text"
+                placeholder="Search for businesses, industries, locations..."
+                value={searchQuery}
+                onChange={handleInputChange}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchQuery.trim()) {
+                    console.log("[BusinessSearchBar] Enter key pressed in input");
+                  }
+                }}
+                className={cn(
+                  "pl-12 pr-28 sm:pr-36 h-12 sm:h-14 text-base rounded-xl border-2 bg-background/80 backdrop-blur-sm transition-all duration-300",
+                  isFocused 
+                    ? "border-transparent ring-0" 
+                    : "border-input/50",
+                  "focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-transparent",
+                  isLocked && "group-hover:blur-sm"
+                )}
+                title={isLocked ? "Sign in or create an account to search" : undefined}
+                disabled={loading || isLocked}
+              />
+              
+              <Button
+                type="submit"
+                size="lg"
+                className={cn(
+                  "absolute right-2 top-1/2 -translate-y-1/2 h-10 sm:h-11 px-5 sm:px-6 rounded-lg",
+                  "bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-600 hover:to-cyan-600",
+                  "text-white border-0 shadow-lg shadow-violet-500/20 transition-all duration-300"
+                )}
+                title={isLocked ? "Sign in or create an account to search" : undefined}
+                disabled={loading || !searchQuery.trim() || isLocked}
+                onClick={(e) => {
+                  if (!searchQuery.trim()) {
+                    e.preventDefault();
+                    return;
+                  }
+                  console.log("[BusinessSearchBar] Search button clicked");
+                }}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <span className="ai-text-gradient">Searching...</span>
+                  </>
+                ) : (
+                "Search"
+                )}
+              </Button>
+            </div>
           </div>
           
           {/* Location Update Button */}
@@ -473,18 +656,38 @@ export function BusinessSearchBar({
               showStaleIndicator={true}
               variant="outline"
               size="default"
-              className="h-14"
+              className="h-11 sm:h-14 w-full sm:w-auto"
             />
           )}
         </div>
       </form>
 
       {/* Helper Text and Filters Toggle */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <p className="text-sm text-muted-foreground">
             Discover businesses by name, industry, location, or keywords
           </p>
+          {!isSessionLoading && !user?.userId && (
+            <span
+              className="text-xs px-2 py-1 rounded-full bg-muted text-foreground"
+              title="Sign in or create an account to unlock search"
+            >
+              Sign in to start searching
+            </span>
+          )}
+          {activeLocationLabel && (
+            <span className="text-xs text-muted-foreground flex items-center gap-2">
+              Using location:
+              <span
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-foreground max-w-[240px] truncate"
+                title={activeLocationRaw || undefined}
+              >
+                <MapPin className="h-3 w-3 text-primary shrink-0" />
+                <span className="truncate">{activeLocationLabel}</span>
+              </span>
+            </span>
+          )}
           {isProcessingSemantic && (
             <div className="flex items-center gap-1 text-xs text-primary">
               <Sparkles className="h-3 w-3 animate-pulse" />
@@ -492,7 +695,7 @@ export function BusinessSearchBar({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {queryAnalysis && (
             <Button
               type="button"
@@ -721,6 +924,7 @@ export function BusinessSearchBar({
           onLocationSet={handleLocationSet}
         />
       )}
+      </div>
     </div>
   );
 }

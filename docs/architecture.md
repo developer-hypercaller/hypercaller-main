@@ -138,8 +138,14 @@ hypercaller/
 - `app/page.tsx`: Home page with business discovery features
 - `app/login/page.tsx`: Login page with form validation
 - `app/register/page.tsx`: 3-step registration form
+- `app/profile/page.tsx`: User profile page
+- `components/business-card.tsx`: Business card component with save functionality
+- `components/business-search-bar.tsx`: Search bar with query input
+- `components/search-results.tsx`: Search results display component
 - `components/confetti-celebration.tsx`: Success celebration animation
 - `components/theme-toggle.tsx`: Dark/light mode toggle
+- `components/location-setup-modal.tsx`: Location setup modal
+- `components/user-profile-dropdown.tsx`: User profile dropdown menu
 
 ### 2. API Layer
 
@@ -162,11 +168,16 @@ hypercaller/
 
 **Search**:
 - `POST /api/search`: Business search with NLP and semantic search
-- `POST /api/embeddings`: Generate embeddings for text
+- `GET /api/search/history`: Get user search history
+- `POST /api/search/history`: Record search history
+- `GET /api/embeddings/status`: Get embedding generation status
 
 **Profile**:
 - `GET /api/profile`: Get user profile
 - `PUT /api/profile`: Update user profile
+- `GET /api/profile/saved-businesses`: Get saved businesses or check if business is saved
+- `POST /api/profile/saved-businesses`: Save a business
+- `DELETE /api/profile/saved-businesses`: Remove a saved business
 
 ### 3. Business Logic Layer
 
@@ -189,6 +200,9 @@ hypercaller/
 - `lib/db/embeddings.js`: Embedding storage and retrieval
 - `lib/db/otp.js`: OTP generation and verification
 - `lib/db/sessions.js`: Session management
+- `lib/db/user-saved-businesses.js`: Saved businesses management
+- `lib/db/user-preferred-categories.js`: User preferred categories management
+- `lib/db/search-history.js`: Search history tracking
 - `lib/server-utils.js`: Server-side utilities (hashing, normalization)
 
 ### 4. Data Layer
@@ -258,7 +272,24 @@ hypercaller/
    - Distance-based ranking
    - Rating and review count
 8. **Response** → Return paginated results to client
-9. **Caching** → Cache query embeddings and results in Redis
+9. **Display** → Results displayed using `components/search-results.tsx` and `components/business-card.tsx`
+10. **Caching** → Cache query embeddings and results in Redis
+11. **History** → Record search in user's search history (if authenticated)
+
+### Saved Businesses Flow
+
+1. **User Action** → Click save button on `BusinessCard` component
+2. **Check Status** → `GET /api/profile/saved-businesses?businessId=xxx` to check if already saved
+3. **Save Request** → `POST /api/profile/saved-businesses` with business data
+4. **Validation** → Check if business already saved (prevent duplicates)
+5. **Storage** → Save to DynamoDB `UserSavedBusinesses` table with:
+   - User ID and business ID (composite key)
+   - Full business data snapshot
+   - Optional note, tags, and source
+   - Timestamp
+6. **Response** → Update UI optimistically, show success toast
+7. **Display** → Saved businesses can be retrieved via `GET /api/profile/saved-businesses`
+8. **Remove** → `DELETE /api/profile/saved-businesses?businessId=xxx` to unsave
 
 ## Security Architecture
 

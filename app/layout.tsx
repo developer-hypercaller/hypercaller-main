@@ -2,12 +2,18 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ToastProvider } from "@/components/toast-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Hypercaller - Business Discovery Platform",
   description: "Discover and connect with businesses worldwide",
+  icons: {
+    icon: { url: "/hypercallerlogo1.png", sizes: "512x512", type: "image/png" },
+    shortcut: { url: "/hypercallerlogo1.png", sizes: "512x512", type: "image/png" },
+    apple: { url: "/hypercallerlogo1.png", sizes: "512x512", type: "image/png" },
+  },
 };
 
 export default function RootLayout({
@@ -20,11 +26,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
           enableSystem={false}
           themes={["light", "dark"]}
         >
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>
