@@ -72,11 +72,14 @@ export async function POST(request: NextRequest) {
     // Generate and store OTP
     const otpCode = await createOTP(normalizedPhone, 'registration', null);
 
-    // In development, return OTP in response (remove in production)
+    // Return OTP in response if enabled via environment variable (for Vercel/deployment)
+    // Set SHOW_OTP_IN_RESPONSE=true in Vercel environment variables to enable
+    const showOtp = process.env.SHOW_OTP_IN_RESPONSE === 'true' || process.env.NODE_ENV === 'development';
+    
     return NextResponse.json({
       success: true,
       message: 'OTP sent successfully',
-      otp: process.env.NODE_ENV === 'development' ? otpCode : undefined, // Only in dev
+      otp: showOtp ? otpCode : undefined,
     });
   } catch (error) {
     console.error('Error sending OTP:', error);

@@ -54,6 +54,10 @@ NODE_ENV=development
 # Public Application URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
+# OTP Debug Mode (optional - set to 'true' to show OTP in API responses for testing)
+# Useful for development and Vercel deployments where SMS might not be configured
+SHOW_OTP_IN_RESPONSE=false
+
 # Google OAuth (if using Google authentication)
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
@@ -214,6 +218,10 @@ UPSTASH_REDIS_REST_TOKEN=your_token_here
 # ============================================
 NODE_ENV=development
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# OTP Debug Mode (set to 'true' to show OTP in API responses for testing)
+# Useful for development and Vercel deployments where SMS might not be configured
+SHOW_OTP_IN_RESPONSE=true
 
 # ============================================
 # Google OAuth (Optional)

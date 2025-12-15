@@ -30,6 +30,7 @@ function RegisterContent() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
@@ -169,10 +170,11 @@ function RegisterContent() {
       }
       setIsOtpVerified(false);
       setFormData({ ...formData, otp: "" }); // Clear previous OTP
+      setOtpSent(true); // Mark OTP as sent
       
-      // Show OTP in toast (only in dev)
+      // Show OTP in toast (always show OTP if available in dev mode)
       if (data.otp) {
-        setToastMessage(`Your OTP is: ${data.otp}`);
+        setToastMessage(`OTP sent! Your OTP is: ${data.otp}`);
       } else {
         setToastMessage("OTP sent successfully! Check your phone.");
       }
@@ -480,7 +482,7 @@ function RegisterContent() {
                   </Button>
                     </div>
                   </div>
-                  {generatedOtp && (
+                  {otpSent && (
                     <div className="space-y-3">
                       <label className="text-sm font-medium block text-center">
                         Enter OTP
@@ -500,6 +502,11 @@ function RegisterContent() {
                         {isVerifyingOtp ? "Verifying..." : isOtpVerified ? "✓ OTP Verified" : "Verify OTP"}
                       </Button>
                       </div>
+                      {generatedOtp && (
+                        <p className="text-xs text-center text-muted-foreground">
+                          Dev mode: OTP is {generatedOtp}
+                        </p>
+                      )}
                     </div>
                   )}
                   <div className="flex justify-end pt-4">
